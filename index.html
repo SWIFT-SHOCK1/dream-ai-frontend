@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DREAM AI — Transforme ton idée en projet</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<div class="bg-glow"></div>
+<div class="bg-stars"></div>
+
+<header class="topbar">
+
+  <div class="brand">
+    <span class="brand-mark">◆</span>
+    <span class="brand-name">DREAM AI</span>
+  </div>
+
+  <div class="top-actions">
+    <button id="language-btn" class="top-btn">FR</button>
+    <button id="theme-btn" class="top-btn">☀️</button>
+    <button id="history-btn" class="top-btn">🗂️</button>
+  </div>
+
+</header>
+
+<main>
+
+<section class="hero" id="hero">
+
+  <p class="eyebrow-free-label">Générateur de projets IA</p>
+
+  <h1 class="hero-title">
+    Transforme ton idée<br>
+    en projet.
+  </h1>
+
+  <p class="hero-sub">
+    Décris ton idée. DREAM AI l'analyse, la structure
+    et te donne une vision claire pour commencer.
+  </p>
+
+  <form class="prompt-box" id="prompt-form">
+
+    <textarea
+      id="idea-input"
+      class="prompt-textarea"
+      placeholder="Exemple : je veux créer une application pour les sportifs..."
+      rows="4"
+      maxlength="600"
+    ></textarea>
+
+    <div class="prompt-footer">
+
+      <span class="char-count">
+        <span id="char-count">0</span>/600
+      </span>
+
+      <button type="submit" class="cta-button" id="generate-btn">
+        <span>✨</span>
+        <span>Analyser mon idée</span>
+      </button>
+
+    </div>
+
+  </form>
+
+  <div class="examples">
+
+    <p class="examples-title">💡 Essaie avec une idée</p>
+
+    <div class="example-list">
+
+      <button class="example-button" type="button"
+        data-idea="Je veux créer une application mobile pour les sportifs avec des entraînements et un suivi des performances.">
+        🏃 Sport
+      </button>
+
+      <button class="example-button" type="button"
+        data-idea="Je veux créer une boutique en ligne moderne pour vendre des vêtements.">
+        🛒 Boutique
+      </button>
+
+      <button class="example-button" type="button"
+        data-idea="Je veux créer un jeu mobile amusant avec des niveaux et un classement.">
+        🎮 Jeu
+      </button>
+
+      <button class="example-button" type="button"
+        data-idea="Je veux créer une plateforme pour apprendre de nouvelles compétences avec des cours et des quiz.">
+        📚 Éducation
+      </button>
+
+    </div>
+
+  </div>
+
+</section>
+
+<section class="loading-state" id="loading-state" hidden>
+
+  <div class="loader-ring"></div>
+
+  <p class="loader-text" id="loader-text">
+    Analyse de ton idée…
+  </p>
+
+</section>
+
+<section class="result" id="result" hidden>
+
+  <div class="result-header">
+
+    <p class="result-kicker">Analyse terminée</p>
+
+    <h2 class="result-title" id="result-name">DREAM PROJECT</h2>
+
+    <p class="result-subtitle" id="result-summary"></p>
+
+    <div class="result-actions">
+
+      <button class="reset-button" id="reset-btn">
+        ← Nouvelle idée
+      </button>
+
+      <button class="improve-button" id="improve-btn">
+        ✨ Améliorer
+      </button>
+
+      <button class="export-button" id="export-btn">
+        📥 Exporter
+      </button>
+
+      <button class="save-button" id="save-btn">
+        💾 Sauvegarder
+      </button>
+
+    </div>
+
+  </div>
+
+  <div class="analysis-panel">
+
+    <div class="score-main">
+
+      <div class="score-circle">
+        <span id="score-value">0</span>
+        <small>/100</small>
+      </div>
+
+      <div>
+        <p class="score-label">Score du projet</p>
+        <p class="score-description" id="score-description">—</p>
+      </div>
+
+    </div>
+
+    <div class="score-bars">
+
+      <div class="score-item">
+        <div class="score-item-top">
+          <span>💡 Originalité</span>
+          <strong id="originality-value">0</strong>
+        </div>
+        <div class="progress">
+          <span id="originality-bar"></span>
+        </div>
+      </div>
+
+      <div class="score-item">
+        <div class="score-item-top">
+          <span>🚀 Potentiel</span>
+          <strong id="potential-value">0</strong>
+        </div>
+        <div class="progress">
+          <span id="potential-bar"></span>
+        </div>
+      </div>
+
+      <div class="score-item">
+        <div class="score-item-top">
+          <span>🛠️ Faisabilité</span>
+          <strong id="feasibility-value">0</strong>
+        </div>
+        <div class="progress">
+          <span id="feasibility-bar"></span>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <div class="result-grid">
+
+    <article class="result-card">
+      <h3>🧠 Concept</h3>
+      <p id="result-concept">—</p>
+    </article>
+
+    <article class="result-card">
+      <h3>🧩 Fonctionnalités</h3>
+      <ul id="result-features" class="feature-list"></ul>
+    </article>
+
+    <article class="result-card">
+      <h3>🚀 Étapes</h3>
+      <ol id="result-steps" class="steps-list"></ol>
+    </article>
+
+    <article class="result-card">
+      <h3>💡 Pour aller plus loin</h3>
+      <ul id="result-ideas" class="ideas-list"></ul>
+    </article>
+
+    <article class="result-card card-money">
+      <h3>💰 Monétisation</h3>
+      <p id="result-money">—</p>
+    </article>
+
+    <article class="result-card interface-card">
+      <h3>🎨 Concept d'interface</h3>
+      <div id="interface-preview" class="interface-preview">
+        <div class="fake-header">DREAM APP</div>
+        <div class="fake-box">Dashboard</div>
+        <div class="fake-box small"></div>
+        <div class="fake-box small"></div>
+      </div>
+    </article>
+
+  </div>
+
+</section>
+
+<section class="history-section" id="history-section" hidden>
+
+  <div class="section-heading">
+    <p class="result-kicker">Tes projets</p>
+    <h2>Historique</h2>
+    <button id="close-history" class="reset-button">Fermer</button>
+  </div>
+
+  <div id="history-list" class="history-list"></div>
+
+</section>
+
+<section class="premium-section">
+
+  <div class="premium-card">
+
+    <div class="premium-badge">⭐ DREAM AI PREMIUM</div>
+
+    <h2>Va plus loin avec tes idées.</h2>
+
+    <p>
+      Débloque des analyses avancées, des concepts d'interface,
+      davantage d'idées et des outils supplémentaires.
+    </p>
+
+    <button id="premium-btn" class="premium-button">
+      Découvrir Premium
+    </button>
+
+  </div>
+
+</section>
+
+<section class="about">
+
+  <h2 class="about-title">Ce que fait DREAM AI</h2>
+
+  <p class="about-sub">
+    Une idée. Une analyse. Un projet.
+  </p>
+
+  <div class="bento">
+
+    <div class="bento-item bento-large">
+      <div class="bento-icon">🧠</div>
+      <h3>Analyse intelligente</h3>
+      <p>
+        Transforme une idée en concept structuré.
+      </p>
+    </div>
+
+    <div class="bento-item">
+      <div class="bento-icon">📊</div>
+      <h3>Score du projet</h3>
+      <p>
+        Analyse son potentiel et sa faisabilité.
+      </p>
+    </div>
+
+    <div class="bento-item">
+      <div class="bento-icon">🚀</div>
+      <h3>Plan de lancement</h3>
+      <p>
+        Découvre les premières étapes.
+      </p>
+    </div>
+
+    <div class="bento-item bento-wide">
+      <div class="bento-icon">✨</div>
+      <h3>Améliore ton idée</h3>
+      <p>
+        Transforme une idée simple en concept plus complet.
+      </p>
+    </div>
+
+  </div>
+
+</section>
+
+</main>
+
+<footer class="site-footer">
+  <p>DREAM AI — prototype de démonstration.</p>
+</footer>
+
+<div class="toast" id="toast"></div>
+
+<script src="script.js"></script>
+
+</body>
+</html>

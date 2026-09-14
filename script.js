@@ -9,11 +9,81 @@ const supabaseClient = window.supabase.createClient(
 );
 
 let currentProject = null;
+let currentUser = null;
+
 /* =========================
-SUPABASE AUTH
+ÉLÉMENTS HTML
 ========================= */
 
-let currentUser = null;
+const form = document.getElementById("prompt-form");
+const textarea = document.getElementById("idea-input");
+const charCount = document.getElementById("char-count");
+
+const hero = document.querySelector(".hero");
+const loading = document.getElementById("loading-state");
+const loaderText = document.getElementById("loader-text");
+const result = document.getElementById("result");
+
+const resultName = document.getElementById("result-name");
+const resultSummary = document.getElementById("result-summary");
+const resultConcept = document.getElementById("result-concept");
+const resultFeatures = document.getElementById("result-features");
+const resultSteps = document.getElementById("result-steps");
+const resultIdeas = document.getElementById("result-ideas");
+const resultMoney = document.getElementById("result-money");
+
+const scoreValue = document.getElementById("score-value");
+const scoreDescription = document.getElementById("score-description");
+
+const originalityValue = document.getElementById("originality-value");
+const originalityBar = document.getElementById("originality-bar");
+
+const potentialValue = document.getElementById("potential-value");
+const potentialBar = document.getElementById("potential-bar");
+
+const feasibilityValue = document.getElementById("feasibility-value");
+const feasibilityBar = document.getElementById("feasibility-bar");
+
+const interfacePreview = document.getElementById("interface-preview");
+
+const historySection = document.getElementById("history-section");
+const historyList = document.getElementById("history-list");
+
+const toast = document.getElementById("toast");
+
+const saveButton = document.getElementById("save-btn");
+const improveButton = document.getElementById("improve-btn");
+const exportButton = document.getElementById("export-btn");
+const resetButton = document.getElementById("reset-btn");
+
+const themeButton = document.getElementById("theme-btn");
+const historyButton = document.getElementById("history-btn");
+const closeHistory = document.getElementById("close-history");
+const languageButton = document.getElementById("language-btn");
+const premiumButton = document.getElementById("premium-btn");
+
+/* =========================
+TOAST
+========================= */
+
+function showToast(message) {
+
+    if (!toast) {
+        console.log(message);
+        return;
+    }
+
+    toast.textContent = message;
+    toast.classList.add("show");
+
+    setTimeout(() => {
+        toast.classList.remove("show");
+    }, 3000);
+}
+
+/* =========================
+AUTH
+========================= */
 
 function creerInterfaceAuth() {
 
@@ -27,8 +97,7 @@ function creerInterfaceAuth() {
 
     authButton.id = "auth-btn";
     authButton.textContent = "👤 Connexion";
-
-    authButton.style.marginLeft = "10px";
+    authButton.className = "top-btn";
 
     header.appendChild(authButton);
 
@@ -156,7 +225,6 @@ function ouvrirAuth() {
             inscription
                 ? "J'ai déjà un compte"
                 : "Créer un compte";
-
     });
 
     closeButton.addEventListener("click", () => {
@@ -175,67 +243,74 @@ function ouvrirAuth() {
             document.getElementById("auth-message");
 
         if (!email || !password) {
+
             message.textContent =
                 "Remplis tous les champs.";
+
             return;
         }
 
         submit.disabled = true;
 
-        if (inscription) {
+        try {
 
-            const { data, error } =
-                await supabaseClient.auth.signUp({
-                    email,
-                    password
-                });
+            if (inscription) {
 
-            submit.disabled = false;
+                const { data, error } =
+                    await supabaseClient.auth.signUp({
+                        email,
+                        password
+                    });
 
-            if (error) {
+                if (error) {
+                    message.textContent = error.message;
+                    return;
+                }
 
                 message.textContent =
-                    error.message;
+                    data.session
+                        ? "Compte créé ✅"
+                        : "Compte créé. Vérifie ton email 📧";
 
-                return;
+            } else {
+
+                const { data, error } =
+                    await supabaseClient.auth.signInWithPassword({
+                        email,
+                        password
+                    });
+
+                if (error) {
+                    message.textContent = error.message;
+                    return;
+                }
+
+                currentUser = data.user;
+
+                modal.remove();
+
+                afficherUtilisateur();
+
+                await chargerHistoriqueSupabase();
+
+                showToast(
+                    "Connexion réussie 👋"
+                );
             }
+
+        } catch (error) {
+
+            console.error(error);
 
             message.textContent =
-                data.session
-                    ? "Compte créé ✅"
-                    : "Compte créé. Vérifie ton email 📧";
+                "Une erreur est survenue.";
 
-        } else {
-
-            const { data, error } =
-                await supabaseClient.auth.signInWithPassword({
-                    email,
-                    password
-                });
+        } finally {
 
             submit.disabled = false;
-
-            if (error) {
-
-                message.textContent =
-                    error.message;
-
-                return;
-            }
-
-            currentUser = data.user;
-
-            modal.remove();
-
-            afficherUtilisateur();
-
-            showToast(
-                "Connexion réussie 👋"
-            );
         }
 
     });
-
 }
 
 function afficherUtilisateur() {
@@ -266,12 +341,14 @@ function afficherUtilisateur() {
 
         authButton.onclick =
             ouvrirAuth;
-
     }
-
 }
 
 function afficherMenuUtilisateur() {
+
+    if (!currentUser) {
+        return;
+    }
 
     const choix =
         confirm(
@@ -283,7 +360,6 @@ function afficherMenuUtilisateur() {
     if (choix) {
         deconnecterUtilisateur();
     }
-
 }
 
 async function deconnecterUtilisateur() {
@@ -301,13 +377,18 @@ async function deconnecterUtilisateur() {
     }
 
     currentUser = null;
+    currentProject = null;
 
     afficherUtilisateur();
+
+    if (historyList) {
+        historyList.innerHTML =
+            "<p class='empty-history'>Connecte-toi pour voir tes projets.</p>";
+    }
 
     showToast(
         "Déconnexion réussie 👋"
     );
-
 }
 
 async function initialiserAuth() {
@@ -324,8 +405,12 @@ async function initialiserAuth() {
 
     afficherUtilisateur();
 
+    if (currentUser) {
+        await chargerHistoriqueSupabase();
+    }
+
     supabaseClient.auth.onAuthStateChange(
-        (event, session) => {
+        async (event, session) => {
 
             currentUser =
                 session
@@ -334,64 +419,15 @@ async function initialiserAuth() {
 
             afficherUtilisateur();
 
+            if (currentUser) {
+                await chargerHistoriqueSupabase();
+            } else if (historyList) {
+                historyList.innerHTML =
+                    "<p class='empty-history'>Connecte-toi pour voir tes projets.</p>";
+            }
         }
     );
-
 }
-
-creerInterfaceAuth();
-
-initialiserAuth();
-/* =========================
-ÉLÉMENTS HTML
-========================= */
-
-const form = document.getElementById("prompt-form");
-const textarea = document.getElementById("idea-input");
-const charCount = document.getElementById("char-count");
-
-const hero = document.querySelector(".hero");
-const loading = document.getElementById("loading-state");
-const loaderText = document.getElementById("loader-text");
-const result = document.getElementById("result");
-
-const resultName = document.getElementById("result-name");
-const resultSummary = document.getElementById("result-summary");
-const resultConcept = document.getElementById("result-concept");
-const resultFeatures = document.getElementById("result-features");
-const resultSteps = document.getElementById("result-steps");
-const resultIdeas = document.getElementById("result-ideas");
-const resultMoney = document.getElementById("result-money");
-
-const scoreValue = document.getElementById("score-value");
-const scoreDescription = document.getElementById("score-description");
-
-const originalityValue = document.getElementById("originality-value");
-const originalityBar = document.getElementById("originality-bar");
-
-const potentialValue = document.getElementById("potential-value");
-const potentialBar = document.getElementById("potential-bar");
-
-const feasibilityValue = document.getElementById("feasibility-value");
-const feasibilityBar = document.getElementById("feasibility-bar");
-
-const interfacePreview = document.getElementById("interface-preview");
-
-const historySection = document.getElementById("history-section");
-const historyList = document.getElementById("history-list");
-
-const toast = document.getElementById("toast");
-
-const saveButton = document.getElementById("save-btn");
-const improveButton = document.getElementById("improve-btn");
-const exportButton = document.getElementById("export-btn");
-const resetButton = document.getElementById("reset-btn");
-
-const themeButton = document.getElementById("theme-btn");
-const historyButton = document.getElementById("history-btn");
-const closeHistory = document.getElementById("close-history");
-const languageButton = document.getElementById("language-btn");
-const premiumButton = document.getElementById("premium-btn");
 
 /* =========================
 AFFICHAGE
@@ -399,56 +435,28 @@ AFFICHAGE
 
 function afficherChargement(visible) {
 
-if (loading) {
-    loading.hidden = !visible;
-}
+    if (loading) {
+        loading.hidden = !visible;
+    }
 
-if (result && visible) {
-    result.hidden = true;
-}
+    if (result && visible) {
+        result.hidden = true;
+    }
 
-if (hero) {
-    hero.style.opacity = visible ? "0.7" : "1";
-}
-
+    if (hero) {
+        hero.style.opacity =
+            visible ? "0.7" : "1";
+    }
 }
 
 function afficherResultat(visible) {
 
-if (!result) {
-    return;
-}
+    if (!result) {
+        return;
+    }
 
-result.hidden = !visible;
-
-if (visible) {
+    result.hidden = !visible;
     result.style.display = "";
-}
-
-if (!visible) {
-    result.style.display = "";
-}
-
-}
-
-/* =========================
-TOAST
-========================= */
-
-function showToast(message) {
-
-if (!toast) {
-    console.log(message);
-    return;
-}
-
-toast.textContent = message;
-toast.classList.add("show");
-
-setTimeout(() => {
-    toast.classList.remove("show");
-}, 3000);
-
 }
 
 /* =========================
@@ -457,41 +465,45 @@ PROTECTION HTML
 
 function escapeHTML(text) {
 
-if (text === null || text === undefined) {
-    return "";
-}
+    if (text === null || text === undefined) {
+        return "";
+    }
 
-return String(text)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-
+    return String(text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
 }
 
 /* =========================
-TRANSFORMER EN LISTE
+LISTES
 ========================= */
 
 function transformerEnListe(text) {
 
-if (!text) {
-    return [];
-}
+    if (!text) {
+        return [];
+    }
 
-return String(text)
-    .split("\n")
-    .map(line => {
+    if (Array.isArray(text)) {
+        return text
+            .map(item => String(item).trim())
+            .filter(Boolean);
+    }
 
-        return line
-            .replace(/^[-•*]\s*/, "")
-            .replace(/^\d+[.)]\s*/, "")
-            .trim();
+    return String(text)
+        .split("\n")
+        .map(line => {
 
-    })
-    .filter(line => line.length > 0);
+            return line
+                .replace(/^[-•*]\s*/, "")
+                .replace(/^\d+[.)]\s*/, "")
+                .trim();
 
+        })
+        .filter(line => line.length > 0);
 }
 
 /* =========================
@@ -500,15 +512,14 @@ COMPTEUR
 
 if (textarea) {
 
-textarea.addEventListener("input", () => {
+    textarea.addEventListener("input", () => {
 
-    if (charCount) {
-        charCount.textContent =
-            textarea.value.length;
-    }
+        if (charCount) {
+            charCount.textContent =
+                textarea.value.length;
+        }
 
-});
-
+    });
 }
 
 /* =========================
@@ -516,28 +527,28 @@ EXEMPLES
 ========================= */
 
 document
-.querySelectorAll(".example-button")
-.forEach(button => {
+    .querySelectorAll(".example-button")
+    .forEach(button => {
 
-    button.addEventListener("click", () => {
+        button.addEventListener("click", () => {
 
-        const idea =
-            button.dataset.idea || "";
+            const idea =
+                button.dataset.idea || "";
 
-        if (textarea) {
+            if (textarea) {
 
-            textarea.value = idea;
+                textarea.value = idea;
 
-            textarea.dispatchEvent(
-                new Event("input")
-            );
+                textarea.dispatchEvent(
+                    new Event("input")
+                );
 
-            textarea.focus();
-        }
+                textarea.focus();
+            }
+
+        });
 
     });
-
-});
 
 /* =========================
 ANALYSER
@@ -545,379 +556,289 @@ ANALYSER
 
 if (form) {
 
-form.addEventListener("submit", async (event) => {
+    form.addEventListener("submit", async (event) => {
 
-    event.preventDefault();
+        event.preventDefault();
 
-    const idea =
-        textarea
-            ? textarea.value.trim()
-            : "";
+        const idea =
+            textarea
+                ? textarea.value.trim()
+                : "";
 
-    if (!idea) {
+        if (!idea) {
+
+            showToast(
+                "Écris une idée avant de lancer l'analyse."
+            );
+
+            return;
+        }
+
+        afficherChargement(true);
+
+        if (loaderText) {
+            loaderText.textContent =
+                "DREAM AI analyse ton idée...";
+        }
+
+        try {
+
+            const response =
+                await fetch(API_URL, {
+
+                    method: "POST",
+
+                    headers: {
+                        "Content-Type":
+                            "application/json"
+                    },
+
+                    body: JSON.stringify({
+                        idea: idea
+                    })
+
+                });
+
+            if (!response.ok) {
+
+                throw new Error(
+                    "Erreur serveur : " +
+                    response.status
+                );
+            }
+
+            const data =
+                await response.json();
+
+            if (!data.ok) {
+
+                throw new Error(
+                    data.error ||
+                    "Erreur DREAM AI."
+                );
+            }
+
+            if (!data.result) {
+
+                throw new Error(
+                    "Aucun résultat reçu."
+                );
+            }
+
+            if (loaderText) {
+
+                loaderText.textContent =
+                    "Analyse terminée !";
+            }
+
+            afficherResultatIA(
+                data.result,
+                idea
+            );
+
+            showToast(
+                "Analyse terminée ✅"
+            );
+
+        } catch (error) {
+
+            console.error(
+                "❌ ERREUR DREAM AI :",
+                error
+            );
+
+            afficherChargement(false);
+
+            showToast(
+                error.message ||
+                "Impossible de contacter DREAM AI."
+            );
+        }
+
+    });
+}
+
+/* =========================
+AFFICHER RESULTAT IA
+========================= */
+
+function afficherResultatIA(text, idea) {
+
+    if (!text) {
 
         showToast(
-            "Écris une idée avant de lancer l'analyse."
+            "Aucun résultat à afficher."
         );
 
         return;
     }
 
-    console.log("🚀 DREAM AI");
-    console.log("💡 Idée :", idea);
+    const nom =
+        extraireSection(
+            text,
+            "NOM DU PROJET",
+            "RÉSUMÉ"
+        );
 
-    afficherChargement(true);
+    const resume =
+        extraireSection(
+            text,
+            "RÉSUMÉ",
+            "CONCEPT"
+        );
 
-    if (loaderText) {
-        loaderText.textContent =
-            "DREAM AI analyse ton idée...";
+    const concept =
+        extraireSection(
+            text,
+            "CONCEPT",
+            "FONCTIONNALITÉS"
+        );
+
+    const fonctionnalites =
+        extraireSection(
+            text,
+            "FONCTIONNALITÉS",
+            "ÉTAPES"
+        );
+
+    const etapes =
+        extraireSection(
+            text,
+            "ÉTAPES",
+            "AMÉLIORATIONS"
+        );
+
+    const ameliorations =
+        extraireSection(
+            text,
+            "AMÉLIORATIONS",
+            "MONÉTISATION"
+        );
+
+    const monetisation =
+        extraireSection(
+            text,
+            "MONÉTISATION",
+            "NOTE"
+        );
+
+    const noteText =
+        extraireSection(
+            text,
+            "NOTE",
+            null
+        );
+
+    const score =
+        extraireNoteIA(noteText);
+
+    currentProject = {
+
+        id: null,
+
+        idea: idea,
+
+        name:
+            nom ||
+            "Projet DREAM AI",
+
+        summary:
+            resume ||
+            "DREAM AI a analysé ton idée.",
+
+        concept:
+            concept ||
+            "Concept généré par DREAM AI.",
+
+        features:
+            fonctionnalites,
+
+        steps:
+            etapes,
+
+        improvements:
+            ameliorations,
+
+        money:
+            monetisation,
+
+        score:
+            score,
+
+        raw:
+            text,
+
+        date:
+            new Date().toLocaleString("fr-FR")
+
+    };
+
+    if (resultName) {
+        resultName.textContent =
+            currentProject.name;
     }
 
-    try {
+    if (resultSummary) {
+        resultSummary.textContent =
+            currentProject.summary;
+    }
 
-        const response =
-            await fetch(API_URL, {
+    if (resultConcept) {
+        resultConcept.textContent =
+            currentProject.concept;
+    }
 
-                method: "POST",
+    afficherListe(
+        resultFeatures,
+        currentProject.features
+    );
 
-                headers: {
-                    "Content-Type":
-                        "application/json"
-                },
+    afficherListe(
+        resultSteps,
+        currentProject.steps
+    );
 
-                body: JSON.stringify({
-                    idea: idea
-                })
+    afficherListe(
+        resultIdeas,
+        currentProject.improvements
+    );
 
+    if (resultMoney) {
+
+        resultMoney.textContent =
+            currentProject.money ||
+            "Aucune information disponible.";
+    }
+
+    afficherScore(
+        currentProject.score
+    );
+
+    genererInterfacePreview(
+        currentProject.name
+    );
+
+    afficherChargement(false);
+
+    afficherResultat(true);
+
+    if (saveButton) {
+        saveButton.textContent =
+            "💾 Sauvegarder";
+    }
+
+    setTimeout(() => {
+
+        if (result) {
+
+            result.scrollIntoView({
+                behavior: "smooth",
+                block: "start"
             });
 
-
-        console.log(
-            "📡 Statut serveur :",
-            response.status
-        );
-
-
-        if (!response.ok) {
-
-            throw new Error(
-                "Erreur serveur : " +
-                response.status
-            );
-
         }
 
-
-        const data =
-            await response.json();
-
-
-        console.log(
-            "🤖 Réponse :",
-            data
-        );
-
-
-        if (!data.ok) {
-
-            throw new Error(
-                data.error ||
-                "Erreur DREAM AI."
-            );
-
-        }
-
-
-        if (!data.result) {
-
-            throw new Error(
-                "Aucun résultat reçu."
-            );
-
-        }
-
-
-        if (loaderText) {
-
-            loaderText.textContent =
-                "Analyse terminée !";
-
-        }
-
-
-        afficherResultatIA(
-            data.result,
-            idea
-        );
-
-
-        showToast(
-            "Analyse terminée ✅"
-        );
-
-
-    } catch (error) {
-
-        console.error(
-            "❌ ERREUR DREAM AI :",
-            error
-        );
-
-
-        afficherChargement(false);
-
-
-        showToast(
-            error.message ||
-            "Impossible de contacter DREAM AI."
-        );
-
-    }
-
-});
-
-}
-
-/* =========================
-AFFICHER RÉSULTAT IA
-========================= */
-
-function afficherResultatIA(text, idea) {
-
-console.log(
-    "🎯 Affichage du résultat..."
-);
-
-
-if (!text) {
-
-    showToast(
-        "Aucun résultat à afficher."
-    );
-
-    return;
-}
-
-
-const nom =
-    extraireSection(
-        text,
-        "NOM DU PROJET",
-        "RÉSUMÉ"
-    );
-
-
-const resume =
-    extraireSection(
-        text,
-        "RÉSUMÉ",
-        "CONCEPT"
-    );
-
-
-const concept =
-    extraireSection(
-        text,
-        "CONCEPT",
-        "FONCTIONNALITÉS"
-    );
-
-
-const fonctionnalites =
-    extraireSection(
-        text,
-        "FONCTIONNALITÉS",
-        "ÉTAPES"
-    );
-
-
-const etapes =
-    extraireSection(
-        text,
-        "ÉTAPES",
-        "AMÉLIORATIONS"
-    );
-
-
-const ameliorations =
-    extraireSection(
-        text,
-        "AMÉLIORATIONS",
-        "MONÉTISATION"
-    );
-
-
-const monetisation =
-    extraireSection(
-        text,
-        "MONÉTISATION",
-        "NOTE"
-    );
-
-
-const noteText =
-    extraireSection(
-        text,
-        "NOTE",
-        null
-    );
-
-
-const score =
-    extraireNoteIA(noteText);
-
-
-currentProject = {
-
-    id: Date.now(),
-
-    idea: idea,
-
-    name:
-        nom ||
-        "Projet DREAM AI",
-
-    summary:
-        resume ||
-        "DREAM AI a analysé ton idée.",
-
-    concept:
-        concept ||
-        "Concept généré par DREAM AI.",
-
-    features:
-        fonctionnalites,
-
-    steps:
-        etapes,
-
-    improvements:
-        ameliorations,
-
-    money:
-        monetisation,
-
-    score:
-        score,
-
-    raw:
-        text,
-
-    date:
-        new Date().toLocaleString(
-            "fr-FR"
-        )
-
-};
-
-
-/* NOM */
-
-if (resultName) {
-
-    resultName.textContent =
-        currentProject.name;
-
-}
-
-
-/* RÉSUMÉ */
-
-if (resultSummary) {
-
-    resultSummary.textContent =
-        currentProject.summary;
-
-}
-
-
-/* CONCEPT */
-
-if (resultConcept) {
-
-    resultConcept.textContent =
-        currentProject.concept;
-
-}
-
-
-/* LISTES */
-
-afficherListe(
-    resultFeatures,
-    currentProject.features
-);
-
-
-afficherListe(
-    resultSteps,
-    currentProject.steps
-);
-
-
-afficherListe(
-    resultIdeas,
-    currentProject.improvements
-);
-
-
-/* MONÉTISATION */
-
-if (resultMoney) {
-
-    resultMoney.textContent =
-        currentProject.money ||
-        "Aucune information disponible.";
-
-}
-
-
-/* SCORE */
-
-afficherScore(
-    currentProject.score
-);
-
-
-/* INTERFACE */
-
-genererInterfacePreview(
-    currentProject.name
-);
-
-
-/* AFFICHAGE */
-
-afficherChargement(false);
-
-afficherResultat(true);
-
-
-/* HISTORIQUE */
-
-sauvegarderDansHistorique(
-    currentProject
-);
-
-
-console.log(
-    "✅ Résultat affiché avec succès."
-);
-
-
-setTimeout(() => {
-
-    if (result) {
-
-        result.scrollIntoView({
-            behavior: "smooth",
-            block: "start"
-        });
-
-    }
-
-}, 100);
-
+    }, 100);
 }
 
 /* =========================
@@ -925,68 +846,58 @@ EXTRAIRE SECTION
 ========================= */
 
 function extraireSection(
-text,
-debut,
-fin
+    text,
+    debut,
+    fin
 ) {
 
-if (!text) {
-    return "";
-}
+    if (!text) {
+        return "";
+    }
 
-
-const escapedStart =
-    debut.replace(
-        /[.*+?^${}()|[\]\\]/g,
-        "\\$&"
-    );
-
-
-let pattern;
-
-
-if (fin) {
-
-    const escapedEnd =
-        fin.replace(
+    const escapedStart =
+        debut.replace(
             /[.*+?^${}()|[\]\\]/g,
             "\\$&"
         );
 
+    let pattern;
 
-    pattern =
-        new RegExp(
-            escapedStart +
-            "\\s*:\\s*([\\s\\S]*?)(?=" +
-            escapedEnd +
-            "\\s*:)",
-            "i"
-        );
+    if (fin) {
 
+        const escapedEnd =
+            fin.replace(
+                /[.*+?^${}()|[\]\\]/g,
+                "\\$&"
+            );
 
-} else {
+        pattern =
+            new RegExp(
+                escapedStart +
+                "\\s*:\\s*([\\s\\S]*?)(?=" +
+                escapedEnd +
+                "\\s*:)",
+                "i"
+            );
 
-    pattern =
-        new RegExp(
-            escapedStart +
-            "\\s*:\\s*([\\s\\S]*)",
-            "i"
-        );
+    } else {
 
-}
+        pattern =
+            new RegExp(
+                escapedStart +
+                "\\s*:\\s*([\\s\\S]*)",
+                "i"
+            );
+    }
 
+    const match =
+        text.match(pattern);
 
-const match =
-    text.match(pattern);
+    if (!match) {
+        return "";
+    }
 
-
-if (!match) {
-    return "";
-}
-
-
-return match[1].trim();
-
+    return match[1].trim();
 }
 
 /* =========================
@@ -995,63 +906,45 @@ NOTE
 
 function extraireNoteIA(text) {
 
-if (!text) {
-    return 75;
-}
-
-
-const match =
-    text.match(
-        /(\d{1,3})\s*\/\s*100/
-    );
-
-
-if (match) {
-
-    let score =
-        parseInt(
-            match[1],
-            10
-        );
-
-
-    return Math.max(
-        0,
-        Math.min(100, score)
-    );
-
-}
-
-
-const number =
-    text.match(
-        /\b(\d{1,3})\b/
-    );
-
-
-if (number) {
-
-    const score =
-        parseInt(
-            number[1],
-            10
-        );
-
-
-    if (
-        score >= 0 &&
-        score <= 100
-    ) {
-
-        return score;
-
+    if (!text) {
+        return 75;
     }
 
-}
+    const match =
+        text.match(
+            /(\d{1,3})\s*\/\s*100/
+        );
 
+    if (match) {
 
-return 75;
+        const score =
+            parseInt(match[1], 10);
 
+        return Math.max(
+            0,
+            Math.min(100, score)
+        );
+    }
+
+    const number =
+        text.match(
+            /\b(\d{1,3})\b/
+        );
+
+    if (number) {
+
+        const score =
+            parseInt(number[1], 10);
+
+        if (
+            score >= 0 &&
+            score <= 100
+        ) {
+            return score;
+        }
+    }
+
+    return 75;
 }
 
 /* =========================
@@ -1059,35 +952,31 @@ AFFICHER LISTE
 ========================= */
 
 function afficherListe(
-element,
-text
+    element,
+    text
 ) {
 
-if (!element) {
-    return;
-}
+    if (!element) {
+        return;
+    }
 
+    const liste =
+        transformerEnListe(text);
 
-const liste =
-    transformerEnListe(text);
+    if (liste.length === 0) {
 
+        element.innerHTML =
+            "<li>Aucune information disponible.</li>";
 
-if (liste.length === 0) {
+        return;
+    }
 
     element.innerHTML =
-        "<li>Aucune information disponible.</li>";
-
-    return;
-}
-
-
-element.innerHTML =
-    liste
-        .map(item =>
-            `<li>${escapeHTML(item)}</li>`
-        )
-        .join("");
-
+        liste
+            .map(item =>
+                `<li>${escapeHTML(item)}</li>`
+            )
+            .join("");
 }
 
 /* =========================
@@ -1096,125 +985,109 @@ SCORE
 
 function afficherScore(score) {
 
-score =
-    Math.max(
-        0,
-        Math.min(
-            100,
-            Number(score) || 0
-        )
-    );
+    score =
+        Math.max(
+            0,
+            Math.min(
+                100,
+                Number(score) || 0
+            )
+        );
 
-
-if (scoreValue) {
-
-    scoreValue.textContent =
-        score;
-
-}
-
-
-if (scoreDescription) {
-
-    if (score >= 90) {
-
-        scoreDescription.textContent =
-            "Excellente idée avec un très fort potentiel.";
-
-    } else if (score >= 75) {
-
-        scoreDescription.textContent =
-            "Très bonne idée avec un potentiel intéressant.";
-
-    } else if (score >= 60) {
-
-        scoreDescription.textContent =
-            "Bonne base qui peut encore être améliorée.";
-
-    } else {
-
-        scoreDescription.textContent =
-            "L'idée nécessite quelques améliorations.";
-
+    if (scoreValue) {
+        scoreValue.textContent =
+            score;
     }
 
-}
+    if (scoreDescription) {
 
+        if (score >= 90) {
 
-const originality =
-    Math.max(
-        20,
-        Math.min(
-            100,
-            score +
-            Math.floor(
-                Math.random() * 15
-            ) - 7
-        )
-    );
+            scoreDescription.textContent =
+                "Excellente idée avec un très fort potentiel.";
 
+        } else if (score >= 75) {
 
-const potential =
-    Math.max(
-        20,
-        Math.min(
-            100,
-            score +
-            Math.floor(
-                Math.random() * 15
-            ) - 7
-        )
-    );
+            scoreDescription.textContent =
+                "Très bonne idée avec un potentiel intéressant.";
 
+        } else if (score >= 60) {
 
-const feasibility =
-    Math.max(
-        20,
-        Math.min(
-            100,
-            score +
-            Math.floor(
-                Math.random() * 15
-            ) - 7
-        )
-    );
+            scoreDescription.textContent =
+                "Bonne base qui peut encore être améliorée.";
 
+        } else {
 
-if (originalityValue) {
-    originalityValue.textContent =
-        originality + "%";
-}
+            scoreDescription.textContent =
+                "L'idée nécessite quelques améliorations.";
+        }
+    }
 
+    const originality =
+        Math.max(
+            20,
+            Math.min(
+                100,
+                score +
+                Math.floor(
+                    Math.random() * 15
+                ) - 7
+            )
+        );
 
-if (originalityBar) {
-    originalityBar.style.width =
-        originality + "%";
-}
+    const potential =
+        Math.max(
+            20,
+            Math.min(
+                100,
+                score +
+                Math.floor(
+                    Math.random() * 15
+                ) - 7
+            )
+        );
 
+    const feasibility =
+        Math.max(
+            20,
+            Math.min(
+                100,
+                score +
+                Math.floor(
+                    Math.random() * 15
+                ) - 7
+            )
+        );
 
-if (potentialValue) {
-    potentialValue.textContent =
-        potential + "%";
-}
+    if (originalityValue) {
+        originalityValue.textContent =
+            originality + "%";
+    }
 
+    if (originalityBar) {
+        originalityBar.style.width =
+            originality + "%";
+    }
 
-if (potentialBar) {
-    potentialBar.style.width =
-        potential + "%";
-}
+    if (potentialValue) {
+        potentialValue.textContent =
+            potential + "%";
+    }
 
+    if (potentialBar) {
+        potentialBar.style.width =
+            potential + "%";
+    }
 
-if (feasibilityValue) {
-    feasibilityValue.textContent =
-        feasibility + "%";
-}
+    if (feasibilityValue) {
+        feasibilityValue.textContent =
+            feasibility + "%";
+    }
 
-
-if (feasibilityBar) {
-    feasibilityBar.style.width =
-        feasibility + "%";
-}
-
+    if (feasibilityBar) {
+        feasibilityBar.style.width =
+            feasibility + "%";
+    }
 }
 
 /* =========================
@@ -1223,383 +1096,639 @@ APERÇU INTERFACE
 
 function genererInterfacePreview(name) {
 
-if (!interfacePreview) {
-    return;
-}
+    if (!interfacePreview) {
+        return;
+    }
 
-
-interfacePreview.innerHTML = `
-
-    <div style="
-        padding:24px;
-        border-radius:20px;
-        background:rgba(255,255,255,0.05);
-    ">
+    interfacePreview.innerHTML = `
 
         <div style="
-            font-size:24px;
-            font-weight:700;
-            margin-bottom:15px;
-        ">
-            ${escapeHTML(name)}
-        </div>
-
-        <div style="
-            display:grid;
-            gap:12px;
+            padding:24px;
+            border-radius:20px;
+            background:rgba(255,255,255,0.05);
         ">
 
             <div style="
-                padding:15px;
-                border-radius:12px;
-                background:rgba(255,255,255,0.07);
+                font-size:24px;
+                font-weight:700;
+                margin-bottom:15px;
             ">
-                Tableau de bord
+                ${escapeHTML(name)}
             </div>
 
             <div style="
-                padding:15px;
-                border-radius:12px;
-                background:rgba(255,255,255,0.07);
+                display:grid;
+                gap:12px;
             ">
-                Fonctionnalités principales
-            </div>
 
-            <div style="
-                padding:15px;
-                border-radius:12px;
-                background:rgba(255,255,255,0.07);
-            ">
-                Statistiques
+                <div style="
+                    padding:15px;
+                    border-radius:12px;
+                    background:rgba(255,255,255,0.07);
+                ">
+                    Tableau de bord
+                </div>
+
+                <div style="
+                    padding:15px;
+                    border-radius:12px;
+                    background:rgba(255,255,255,0.07);
+                ">
+                    Fonctionnalités principales
+                </div>
+
+                <div style="
+                    padding:15px;
+                    border-radius:12px;
+                    background:rgba(255,255,255,0.07);
+                ">
+                    Statistiques
+                </div>
+
             </div>
 
         </div>
 
-    </div>
-
-`;
-
+    `;
 }
 
 /* =========================
-HISTORIQUE
+SUPABASE — SAUVEGARDER
 ========================= */
 
-function recupererHistorique() {
+async function sauvegarderProjetSupabase(project) {
 
-try {
+    if (!currentUser) {
 
-    return JSON.parse(
-        localStorage.getItem(
-            "dreamAIHistory"
-        )
-    ) || [];
-
-} catch {
-
-    return [];
-
-}
-
-}
-
-function sauvegarderDansHistorique(
-project
-) {
-
-try {
-
-    let historique =
-        recupererHistorique();
-
-
-    /* Évite les doublons */
-
-    historique =
-        historique.filter(
-            item =>
-                item.id !== project.id
+        showToast(
+            "Connecte-toi pour sauvegarder ton projet ☁️"
         );
 
+        return false;
+    }
 
-    historique.unshift(project);
+    if (!project) {
+        return false;
+    }
 
+    const projetDB = {
 
-    historique =
-        historique.slice(0, 20);
+        user_id:
+            currentUser.id,
 
+        name:
+            project.name || "Projet DREAM AI",
 
-    localStorage.setItem(
-        "dreamAIHistory",
-        JSON.stringify(historique)
-    );
+        idea:
+            project.idea || "",
 
+        summary:
+            project.summary || "",
 
-    afficherHistorique();
+        concept:
+            project.concept || "",
 
+        features:
+            transformerEnListe(
+                project.features
+            ),
 
-} catch (error) {
+        steps:
+            transformerEnListe(
+                project.steps
+            ),
 
-    console.error(
-        "Erreur historique :",
-        error
-    );
+        improvements:
+            transformerEnListe(
+                project.improvements
+            ),
 
+        money:
+            project.money || "",
+
+        score:
+            Number(project.score) || 0,
+
+        raw:
+            project.raw || ""
+
+    };
+
+    try {
+
+        const { data, error } =
+            await supabaseClient
+                .from("projects")
+                .insert(projetDB)
+                .select()
+                .single();
+
+        if (error) {
+
+            console.error(
+                "Erreur Supabase :",
+                error
+            );
+
+            showToast(
+                "Erreur de sauvegarde : " +
+                error.message
+            );
+
+            return false;
+        }
+
+        if (data) {
+
+            currentProject.id =
+                data.id;
+
+            currentProject.cloudId =
+                data.id;
+
+            currentProject.created_at =
+                data.created_at;
+
+        }
+
+        showToast(
+            "Projet sauvegardé dans ton compte ☁️"
+        );
+
+        if (saveButton) {
+            saveButton.textContent =
+                "✅ Sauvegardé";
+        }
+
+        await chargerHistoriqueSupabase();
+
+        return true;
+
+    } catch (error) {
+
+        console.error(error);
+
+        showToast(
+            "Impossible de sauvegarder le projet."
+        );
+
+        return false;
+    }
 }
 
-}
+/* =========================
+SUPABASE — HISTORIQUE
+========================= */
 
-function afficherHistorique() {
+async function chargerHistoriqueSupabase() {
 
-if (!historyList) {
-    return;
-}
+    if (!historyList) {
+        return;
+    }
 
+    if (!currentUser) {
 
-const historique =
-    recupererHistorique();
+        historyList.innerHTML =
+            "<p class='empty-history'>Connecte-toi pour voir tes projets.</p>";
 
+        return;
+    }
 
-if (historique.length === 0) {
+    try {
 
-    historyList.innerHTML =
-        "<p>Aucun projet sauvegardé.</p>";
-
-    return;
-
-}
-
-
-historyList.innerHTML =
-    historique
-        .map(
-            (project, index) => `
-
-            <div
-                class="history-item"
-                data-index="${index}"
-                style="cursor:pointer;"
-            >
-
-                <strong>
-                    ${escapeHTML(
-                        project.name ||
-                        "Projet sans nom"
-                    )}
-                </strong>
-
-                <p>
-                    ${escapeHTML(
-                        project.summary ||
-                        project.idea ||
-                        ""
-                    )}
-                </p>
-
-                <small>
-                    ${escapeHTML(
-                        project.date ||
-                        ""
-                    )}
-                </small>
-
-            </div>
-
-        `
-        )
-        .join("");
-
-
-document
-    .querySelectorAll(
-        ".history-item"
-    )
-    .forEach(item => {
-
-        item.addEventListener(
-            "click",
-            () => {
-
-                const index =
-                    Number(
-                        item.dataset.index
-                    );
-
-
-                chargerProjetHistorique(
-                    historique[index]
+        const { data, error } =
+            await supabaseClient
+                .from("projects")
+                .select("*")
+                .eq("user_id", currentUser.id)
+                .order(
+                    "created_at",
+                    {
+                        ascending: false
+                    }
                 );
 
-            }
+        if (error) {
+
+            console.error(
+                "Erreur historique Supabase :",
+                error
+            );
+
+            historyList.innerHTML =
+                "<p class='empty-history'>Impossible de charger l'historique.</p>";
+
+            return;
+        }
+
+        afficherHistoriqueSupabase(
+            data || []
         );
 
-    });
+    } catch (error) {
 
+        console.error(error);
+
+        historyList.innerHTML =
+            "<p class='empty-history'>Erreur de chargement.</p>";
+    }
+}
+
+function afficherHistoriqueSupabase(projects) {
+
+    if (!historyList) {
+        return;
+    }
+
+    if (!projects.length) {
+
+        historyList.innerHTML =
+            "<p class='empty-history'>Aucun projet sauvegardé.</p>";
+
+        return;
+    }
+
+    historyList.innerHTML =
+        projects
+            .map(
+                project => `
+
+                <div
+                    class="history-card"
+                    data-id="${escapeHTML(project.id)}"
+                >
+
+                    <div>
+
+                        <strong>
+                            ${escapeHTML(
+                                project.name ||
+                                "Projet sans nom"
+                            )}
+                        </strong>
+
+                        <p>
+                            ${escapeHTML(
+                                project.summary ||
+                                project.idea ||
+                                ""
+                            )}
+                        </p>
+
+                        <small>
+                            ${escapeHTML(
+                                project.created_at
+                                    ? new Date(
+                                        project.created_at
+                                    ).toLocaleString("fr-FR")
+                                    : ""
+                            )}
+                        </small>
+
+                    </div>
+
+                    <div class="history-actions">
+
+                        <button
+                            class="load-project-button"
+                            data-id="${escapeHTML(project.id)}"
+                        >
+                            Ouvrir
+                        </button>
+
+                        <button
+                            class="delete-project-button"
+                            data-id="${escapeHTML(project.id)}"
+                        >
+                            Supprimer
+                        </button>
+
+                    </div>
+
+                </div>
+
+            `
+            )
+            .join("");
+
+    document
+        .querySelectorAll(
+            ".load-project-button"
+        )
+        .forEach(button => {
+
+            button.addEventListener(
+                "click",
+                async event => {
+
+                    event.stopPropagation();
+
+                    await chargerProjetSupabase(
+                        button.dataset.id
+                    );
+
+                }
+            );
+
+        });
+
+    document
+        .querySelectorAll(
+            ".delete-project-button"
+        )
+        .forEach(button => {
+
+            button.addEventListener(
+                "click",
+                async event => {
+
+                    event.stopPropagation();
+
+                    await supprimerProjetSupabase(
+                        button.dataset.id
+                    );
+
+                }
+            );
+
+        });
+}
+
+/* =========================
+CHARGER PROJET SUPABASE
+========================= */
+
+async function chargerProjetSupabase(id) {
+
+    if (!currentUser || !id) {
+        return;
+    }
+
+    try {
+
+        const { data, error } =
+            await supabaseClient
+                .from("projects")
+                .select("*")
+                .eq("id", id)
+                .eq("user_id", currentUser.id)
+                .single();
+
+        if (error) {
+
+            console.error(error);
+
+            showToast(
+                "Impossible de charger le projet."
+            );
+
+            return;
+        }
+
+        chargerProjetHistorique(
+            data
+        );
+
+    } catch (error) {
+
+        console.error(error);
+
+        showToast(
+            "Erreur de chargement."
+        );
+    }
+}
+
+/* =========================
+SUPPRIMER PROJET SUPABASE
+========================= */
+
+async function supprimerProjetSupabase(id) {
+
+    if (!currentUser || !id) {
+        return;
+    }
+
+    const confirmation =
+        confirm(
+            "Supprimer ce projet de ton historique ?"
+        );
+
+    if (!confirmation) {
+        return;
+    }
+
+    try {
+
+        const { error } =
+            await supabaseClient
+                .from("projects")
+                .delete()
+                .eq("id", id)
+                .eq("user_id", currentUser.id);
+
+        if (error) {
+
+            console.error(error);
+
+            showToast(
+                "Impossible de supprimer le projet."
+            );
+
+            return;
+        }
+
+        showToast(
+            "Projet supprimé 🗑️"
+        );
+
+        await chargerHistoriqueSupabase();
+
+    } catch (error) {
+
+        console.error(error);
+
+        showToast(
+            "Erreur de suppression."
+        );
+    }
 }
 
 /* =========================
 CHARGER PROJET
 ========================= */
 
-function chargerProjetHistorique(
-project
-) {
+function chargerProjetHistorique(project) {
 
-if (!project) {
-    return;
-}
-
-
-currentProject = project;
-
-
-if (textarea) {
-
-    textarea.value =
-        project.idea || "";
-
-    textarea.dispatchEvent(
-        new Event("input")
-    );
-
-}
-
-
-if (resultName) {
-    resultName.textContent =
-        project.name || "";
-}
-
-
-if (resultSummary) {
-    resultSummary.textContent =
-        project.summary || "";
-}
-
-
-if (resultConcept) {
-    resultConcept.textContent =
-        project.concept || "";
-}
-
-
-afficherListe(
-    resultFeatures,
-    project.features || ""
-);
-
-
-afficherListe(
-    resultSteps,
-    project.steps || ""
-);
-
-
-afficherListe(
-    resultIdeas,
-    project.improvements || ""
-);
-
-
-if (resultMoney) {
-
-    resultMoney.textContent =
-        project.money || "";
-
-}
-
-
-afficherScore(
-    project.score || 0
-);
-
-
-genererInterfacePreview(
-    project.name ||
-    "Projet DREAM AI"
-);
-
-
-afficherResultat(true);
-
-
-if (historySection) {
-    historySection.hidden = true;
-}
-
-
-showToast(
-    "Projet chargé ✅"
-);
-
-
-setTimeout(() => {
-
-    if (result) {
-
-        result.scrollIntoView({
-            behavior: "smooth",
-            block: "start"
-        });
-
+    if (!project) {
+        return;
     }
 
-}, 100);
+    currentProject = {
 
+        id:
+            project.id || null,
+
+        cloudId:
+            project.id || null,
+
+        idea:
+            project.idea || "",
+
+        name:
+            project.name || "Projet DREAM AI",
+
+        summary:
+            project.summary || "",
+
+        concept:
+            project.concept || "",
+
+        features:
+            project.features || [],
+
+        steps:
+            project.steps || [],
+
+        improvements:
+            project.improvements || [],
+
+        money:
+            project.money || "",
+
+        score:
+            project.score || 0,
+
+        raw:
+            project.raw || "",
+
+        created_at:
+            project.created_at || null
+
+    };
+
+    if (textarea) {
+
+        textarea.value =
+            currentProject.idea;
+
+        textarea.dispatchEvent(
+            new Event("input")
+        );
+    }
+
+    if (resultName) {
+        resultName.textContent =
+            currentProject.name;
+    }
+
+    if (resultSummary) {
+        resultSummary.textContent =
+            currentProject.summary;
+    }
+
+    if (resultConcept) {
+        resultConcept.textContent =
+            currentProject.concept;
+    }
+
+    afficherListe(
+        resultFeatures,
+        currentProject.features
+    );
+
+    afficherListe(
+        resultSteps,
+        currentProject.steps
+    );
+
+    afficherListe(
+        resultIdeas,
+        currentProject.improvements
+    );
+
+    if (resultMoney) {
+        resultMoney.textContent =
+            currentProject.money;
+    }
+
+    afficherScore(
+        currentProject.score
+    );
+
+    genererInterfacePreview(
+        currentProject.name
+    );
+
+    afficherResultat(true);
+
+    if (historySection) {
+        historySection.hidden = true;
+    }
+
+    if (saveButton) {
+        saveButton.textContent =
+            "✅ Sauvegardé";
+    }
+
+    showToast(
+        "Projet chargé ✅"
+    );
+
+    setTimeout(() => {
+
+        if (result) {
+
+            result.scrollIntoView({
+                behavior: "smooth",
+                block: "start"
+            });
+
+        }
+
+    }, 100);
 }
 
 /* =========================
-SAUVEGARDER
+SAUVEGARDER — BOUTON
 ========================= */
 
 if (saveButton) {
 
-saveButton.addEventListener(
-    "click",
-    () => {
+    saveButton.addEventListener(
+        "click",
+        async () => {
 
-        if (!currentProject) {
+            if (!currentProject) {
 
-            showToast(
-                "Analyse d'abord une idée."
+                showToast(
+                    "Analyse d'abord une idée."
+                );
+
+                return;
+            }
+
+            if (!currentUser) {
+
+                showToast(
+                    "Connecte-toi pour sauvegarder ton projet ☁️"
+                );
+
+                ouvrirAuth();
+
+                return;
+            }
+
+            saveButton.disabled = true;
+
+            await sauvegarderProjetSupabase(
+                currentProject
             );
 
-            return;
-        }
-
-
-        try {
-
-            localStorage.setItem(
-                "dreamAISaved",
-                JSON.stringify(
-                    currentProject
-                )
-            );
-
-
-            saveButton.textContent =
-                "✅ Sauvegardé";
-
-
-            showToast(
-                "Projet sauvegardé !"
-            );
-
-
-        } catch (error) {
-
-            console.error(error);
-
-            showToast(
-                "Impossible de sauvegarder."
-            );
+            saveButton.disabled = false;
 
         }
-
-    }
-);
-
+    );
 }
 
 /* =========================
@@ -1608,46 +1737,40 @@ AMÉLIORER
 
 if (improveButton) {
 
-improveButton.addEventListener(
-    "click",
-    async () => {
+    improveButton.addEventListener(
+        "click",
+        () => {
 
-        if (!currentProject) {
+            if (!currentProject) {
+
+                showToast(
+                    "Analyse d'abord une idée."
+                );
+
+                return;
+            }
+
+            const nouvelleIdee =
+                currentProject.idea +
+                "\n\nAméliore cette idée : rends-la plus originale, plus utile et plus réaliste.";
+
+            if (textarea) {
+
+                textarea.value =
+                    nouvelleIdee;
+
+                textarea.dispatchEvent(
+                    new Event("input")
+                );
+
+                textarea.focus();
+            }
 
             showToast(
-                "Analyse d'abord une idée."
+                "Idée améliorée ✨ Clique sur Analyser."
             );
-
-            return;
         }
-
-
-        const nouvelleIdee =
-            currentProject.idea +
-            "\n\nAméliore cette idée : rends-la plus originale, plus utile et plus réaliste.";
-
-
-        if (textarea) {
-
-            textarea.value =
-                nouvelleIdee;
-
-            textarea.dispatchEvent(
-                new Event("input")
-            );
-
-            textarea.focus();
-
-        }
-
-
-        showToast(
-            "Idée améliorée ✨ Clique sur Analyser."
-        );
-
-    }
-);
-
+    );
 }
 
 /* =========================
@@ -1656,21 +1779,20 @@ EXPORTER
 
 if (exportButton) {
 
-exportButton.addEventListener(
-    "click",
-    () => {
+    exportButton.addEventListener(
+        "click",
+        () => {
 
-        if (!currentProject) {
+            if (!currentProject) {
 
-            showToast(
-                "Aucun projet à exporter."
-            );
+                showToast(
+                    "Aucun projet à exporter."
+                );
 
-            return;
-        }
+                return;
+            }
 
-
-        const contenu = `
+            const contenu = `
 
 DREAM AI
 
@@ -1684,13 +1806,13 @@ CONCEPT
 ${currentProject.concept}
 
 FONCTIONNALITÉS
-${currentProject.features}
+${transformerEnListe(currentProject.features).join("\n")}
 
 ÉTAPES
-${currentProject.steps}
+${transformerEnListe(currentProject.steps).join("\n")}
 
 AMÉLIORATIONS
-${currentProject.improvements}
+${transformerEnListe(currentProject.improvements).join("\n")}
 
 MONÉTISATION
 ${currentProject.money}
@@ -1706,49 +1828,41 @@ Généré avec DREAM AI
 
 `;
 
-        const blob =
-            new Blob(
-                [contenu],
-                {
-                    type:
-                        "text/plain;charset=utf-8"
-                }
+            const blob =
+                new Blob(
+                    [contenu],
+                    {
+                        type:
+                            "text/plain;charset=utf-8"
+                    }
+                );
+
+            const url =
+                URL.createObjectURL(blob);
+
+            const link =
+                document.createElement("a");
+
+            link.href = url;
+
+            link.download =
+                "dream-ai-projet.txt";
+
+            document.body.appendChild(link);
+
+            link.click();
+
+            link.remove();
+
+            setTimeout(() => {
+                URL.revokeObjectURL(url);
+            }, 1000);
+
+            showToast(
+                "Projet exporté 📥"
             );
-
-
-        const url =
-            URL.createObjectURL(blob);
-
-
-        const link =
-            document.createElement("a");
-
-
-        link.href = url;
-
-        link.download =
-            "dream-ai-projet.txt";
-
-
-        document.body.appendChild(link);
-
-        link.click();
-
-        link.remove();
-
-
-        setTimeout(() => {
-            URL.revokeObjectURL(url);
-        }, 1000);
-
-
-        showToast(
-            "Projet exporté 📥"
-        );
-
-    }
-);
-
+        }
+    );
 }
 
 /* =========================
@@ -1757,53 +1871,43 @@ NOUVELLE IDÉE
 
 if (resetButton) {
 
-resetButton.addEventListener(
-    "click",
-    () => {
+    resetButton.addEventListener(
+        "click",
+        () => {
 
-        currentProject = null;
+            currentProject = null;
 
+            if (textarea) {
 
-        if (textarea) {
+                textarea.value = "";
 
-            textarea.value = "";
+                textarea.dispatchEvent(
+                    new Event("input")
+                );
+            }
 
-            textarea.dispatchEvent(
-                new Event("input")
+            afficherResultat(false);
+            afficherChargement(false);
+
+            if (hero) {
+                hero.style.opacity = "1";
+            }
+
+            if (saveButton) {
+                saveButton.textContent =
+                    "💾 Sauvegarder";
+            }
+
+            window.scrollTo({
+                top: 0,
+                behavior: "smooth"
+            });
+
+            showToast(
+                "Prêt pour une nouvelle idée 🚀"
             );
-
         }
-
-
-        afficherResultat(false);
-
-        afficherChargement(false);
-
-
-        if (hero) {
-            hero.style.opacity = "1";
-        }
-
-
-        if (saveButton) {
-            saveButton.textContent =
-                "💾 Sauvegarder";
-        }
-
-
-        window.scrollTo({
-            top: 0,
-            behavior: "smooth"
-        });
-
-
-        showToast(
-            "Prêt pour une nouvelle idée 🚀"
-        );
-
-    }
-);
-
+    );
 }
 
 /* =========================
@@ -1812,61 +1916,53 @@ THÈME
 
 function appliquerTheme(theme) {
 
-const light =
-    theme === "light";
+    const light =
+        theme === "light";
 
+    document.body.classList.toggle(
+        "light",
+        light
+    );
 
-document.body.classList.toggle(
-    "light-mode",
-    light
-);
+    if (themeButton) {
 
-
-if (themeButton) {
-
-    themeButton.textContent =
-        light ? "🌙" : "☀️";
-
-}
-
-
-localStorage.setItem(
-    "dreamAITheme",
-    light ? "light" : "dark"
-);
-
-}
-
-if (themeButton) {
-
-themeButton.addEventListener(
-    "click",
-    () => {
-
-        const light =
-            document.body.classList.contains(
-                "light-mode"
-            );
-
-
-        appliquerTheme(
-            light
-                ? "dark"
-                : "light"
-        );
-
+        themeButton.textContent =
+            light ? "🌙" : "☀️";
     }
-);
 
+    localStorage.setItem(
+        "dreamAITheme",
+        light ? "light" : "dark"
+    );
+}
+
+if (themeButton) {
+
+    themeButton.addEventListener(
+        "click",
+        () => {
+
+            const light =
+                document.body.classList.contains(
+                    "light"
+                );
+
+            appliquerTheme(
+                light
+                    ? "dark"
+                    : "light"
+            );
+        }
+    );
 }
 
 const savedTheme =
-localStorage.getItem(
-"dreamAITheme"
-);
+    localStorage.getItem(
+        "dreamAITheme"
+    );
 
 if (savedTheme) {
-appliquerTheme(savedTheme);
+    appliquerTheme(savedTheme);
 }
 
 /* =========================
@@ -1875,33 +1971,39 @@ HISTORIQUE — BOUTON
 
 if (historyButton) {
 
-historyButton.addEventListener(
-    "click",
-    () => {
+    historyButton.addEventListener(
+        "click",
+        async () => {
 
-        afficherHistorique();
+            if (!currentUser) {
 
+                showToast(
+                    "Connecte-toi pour accéder à ton historique ☁️"
+                );
 
-        if (historySection) {
+                ouvrirAuth();
 
-            historySection.hidden =
-                !historySection.hidden;
-
-
-            if (!historySection.hidden) {
-
-                historySection.scrollIntoView({
-                    behavior: "smooth",
-                    block: "start"
-                });
-
+                return;
             }
 
+            await chargerHistoriqueSupabase();
+
+            if (historySection) {
+
+                historySection.hidden =
+                    !historySection.hidden;
+
+                if (!historySection.hidden) {
+
+                    historySection.scrollIntoView({
+                        behavior: "smooth",
+                        block: "start"
+                    });
+
+                }
+            }
         }
-
-    }
-);
-
+    );
 }
 
 /* =========================
@@ -1910,17 +2012,16 @@ FERMER HISTORIQUE
 
 if (closeHistory) {
 
-closeHistory.addEventListener(
-    "click",
-    () => {
+    closeHistory.addEventListener(
+        "click",
+        () => {
 
-        if (historySection) {
-            historySection.hidden = true;
+            if (historySection) {
+                historySection.hidden = true;
+            }
+
         }
-
-    }
-);
-
+    );
 }
 
 /* =========================
@@ -1929,41 +2030,34 @@ LANGUE
 
 if (languageButton) {
 
-languageButton.addEventListener(
-    "click",
-    () => {
+    languageButton.addEventListener(
+        "click",
+        () => {
 
-        const languages =
-            ["FR", "EN", "AR"];
+            const languages =
+                ["FR", "EN", "AR"];
 
+            const current =
+                languageButton.textContent
+                    .trim();
 
-        const current =
-            languageButton.textContent
-                .trim();
+            const index =
+                languages.indexOf(current);
 
+            const next =
+                languages[
+                    (index + 1) %
+                    languages.length
+                ];
 
-        const index =
-            languages.indexOf(current);
+            languageButton.textContent =
+                next;
 
-
-        const next =
-            languages[
-                (index + 1) %
-                languages.length
-            ];
-
-
-        languageButton.textContent =
-            next;
-
-
-        showToast(
-            "Langue : " + next
-        );
-
-    }
-);
-
+            showToast(
+                "Langue : " + next
+            );
+        }
+    );
 }
 
 /* =========================
@@ -1972,43 +2066,16 @@ PREMIUM
 
 if (premiumButton) {
 
-premiumButton.addEventListener(
-    "click",
-    () => {
+    premiumButton.addEventListener(
+        "click",
+        () => {
 
-        showToast(
-            "DREAM AI Premium arrive bientôt ⭐"
-        );
+            showToast(
+                "DREAM AI Premium arrive bientôt ⭐"
+            );
 
-    }
-);
-
-}
-
-/* =========================
-PROJET SAUVEGARDÉ
-========================= */
-
-const savedProject =
-localStorage.getItem(
-"dreamAISaved"
-);
-
-if (savedProject) {
-
-try {
-
-    currentProject =
-        JSON.parse(
-            savedProject
-        );
-
-} catch {
-
-    currentProject = null;
-
-}
-
+        }
+    );
 }
 
 /* =========================
@@ -2016,19 +2083,21 @@ INITIALISATION
 ========================= */
 
 if (loading) {
-loading.hidden = true;
+    loading.hidden = true;
 }
 
 if (result) {
-result.hidden = true;
+    result.hidden = true;
 }
 
 if (historySection) {
-historySection.hidden = true;
+    historySection.hidden = true;
 }
 
-afficherHistorique();
+creerInterfaceAuth();
+
+initialiserAuth();
 
 console.log(
-"🚀 DREAM AI chargé avec succès."
+    "🚀 DREAM AI chargé avec succès."
 );

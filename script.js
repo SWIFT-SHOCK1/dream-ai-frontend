@@ -1,7 +1,347 @@
 const API_URL = "https://dream-ai-backend-op32.onrender.com/api/analyze";
 
-let currentProject = null;
+const SUPABASE_URL = "https://wjidmjstomsxsbyzrisu.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_sPpBRJe5BtVw7yQFfjRNuA_UlqJFNXy";
 
+const supabaseClient = window.supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_PUBLISHABLE_KEY
+);
+
+let currentProject = null;
+/* =========================
+SUPABASE AUTH
+========================= */
+
+let currentUser = null;
+
+function creerInterfaceAuth() {
+
+    const header = document.querySelector("header");
+
+    if (!header || document.getElementById("auth-btn")) {
+        return;
+    }
+
+    const authButton = document.createElement("button");
+
+    authButton.id = "auth-btn";
+    authButton.textContent = "👤 Connexion";
+
+    authButton.style.marginLeft = "10px";
+
+    header.appendChild(authButton);
+
+    authButton.addEventListener("click", ouvrirAuth);
+}
+
+function ouvrirAuth() {
+
+    if (document.getElementById("auth-modal")) {
+        return;
+    }
+
+    const modal = document.createElement("div");
+
+    modal.id = "auth-modal";
+
+    modal.innerHTML = `
+        <div style="
+            position:fixed;
+            inset:0;
+            background:rgba(0,0,0,.7);
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            z-index:9999;
+            padding:20px;
+        ">
+
+            <div style="
+                width:100%;
+                max-width:400px;
+                background:#151515;
+                padding:25px;
+                border-radius:20px;
+            ">
+
+                <h2 id="auth-title">
+                    Connexion à DREAM AI
+                </h2>
+
+                <input
+                    id="auth-email"
+                    type="email"
+                    placeholder="Email"
+                    style="
+                        width:100%;
+                        padding:12px;
+                        margin:8px 0;
+                    "
+                >
+
+                <input
+                    id="auth-password"
+                    type="password"
+                    placeholder="Mot de passe"
+                    style="
+                        width:100%;
+                        padding:12px;
+                        margin:8px 0;
+                    "
+                >
+
+                <button
+                    id="auth-submit"
+                    style="
+                        width:100%;
+                        padding:12px;
+                        margin-top:10px;
+                    "
+                >
+                    Se connecter
+                </button>
+
+                <button
+                    id="auth-switch"
+                    style="
+                        width:100%;
+                        padding:10px;
+                        margin-top:10px;
+                    "
+                >
+                    Créer un compte
+                </button>
+
+                <button
+                    id="auth-close"
+                    style="
+                        width:100%;
+                        padding:10px;
+                        margin-top:10px;
+                    "
+                >
+                    Fermer
+                </button>
+
+                <p id="auth-message"></p>
+
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    let inscription = false;
+
+    const submit = document.getElementById("auth-submit");
+    const switchButton = document.getElementById("auth-switch");
+    const closeButton = document.getElementById("auth-close");
+
+    switchButton.addEventListener("click", () => {
+
+        inscription = !inscription;
+
+        document.getElementById("auth-title").textContent =
+            inscription
+                ? "Créer un compte DREAM AI"
+                : "Connexion à DREAM AI";
+
+        submit.textContent =
+            inscription
+                ? "Créer mon compte"
+                : "Se connecter";
+
+        switchButton.textContent =
+            inscription
+                ? "J'ai déjà un compte"
+                : "Créer un compte";
+
+    });
+
+    closeButton.addEventListener("click", () => {
+        modal.remove();
+    });
+
+    submit.addEventListener("click", async () => {
+
+        const email =
+            document.getElementById("auth-email").value.trim();
+
+        const password =
+            document.getElementById("auth-password").value;
+
+        const message =
+            document.getElementById("auth-message");
+
+        if (!email || !password) {
+            message.textContent =
+                "Remplis tous les champs.";
+            return;
+        }
+
+        submit.disabled = true;
+
+        if (inscription) {
+
+            const { data, error } =
+                await supabaseClient.auth.signUp({
+                    email,
+                    password
+                });
+
+            submit.disabled = false;
+
+            if (error) {
+
+                message.textContent =
+                    error.message;
+
+                return;
+            }
+
+            message.textContent =
+                data.session
+                    ? "Compte créé ✅"
+                    : "Compte créé. Vérifie ton email 📧";
+
+        } else {
+
+            const { data, error } =
+                await supabaseClient.auth.signInWithPassword({
+                    email,
+                    password
+                });
+
+            submit.disabled = false;
+
+            if (error) {
+
+                message.textContent =
+                    error.message;
+
+                return;
+            }
+
+            currentUser = data.user;
+
+            modal.remove();
+
+            afficherUtilisateur();
+
+            showToast(
+                "Connexion réussie 👋"
+            );
+        }
+
+    });
+
+}
+
+function afficherUtilisateur() {
+
+    const authButton =
+        document.getElementById("auth-btn");
+
+    if (!authButton) {
+        return;
+    }
+
+    if (currentUser) {
+
+        authButton.textContent =
+            "👤 " +
+            (
+                currentUser.email ||
+                "Mon compte"
+            );
+
+        authButton.onclick =
+            afficherMenuUtilisateur;
+
+    } else {
+
+        authButton.textContent =
+            "👤 Connexion";
+
+        authButton.onclick =
+            ouvrirAuth;
+
+    }
+
+}
+
+function afficherMenuUtilisateur() {
+
+    const choix =
+        confirm(
+            "Connecté avec : " +
+            currentUser.email +
+            "\n\nOK = Déconnexion"
+        );
+
+    if (choix) {
+        deconnecterUtilisateur();
+    }
+
+}
+
+async function deconnecterUtilisateur() {
+
+    const { error } =
+        await supabaseClient.auth.signOut();
+
+    if (error) {
+
+        showToast(
+            "Erreur de déconnexion."
+        );
+
+        return;
+    }
+
+    currentUser = null;
+
+    afficherUtilisateur();
+
+    showToast(
+        "Déconnexion réussie 👋"
+    );
+
+}
+
+async function initialiserAuth() {
+
+    const {
+        data
+    } =
+        await supabaseClient.auth.getSession();
+
+    currentUser =
+        data.session
+            ? data.session.user
+            : null;
+
+    afficherUtilisateur();
+
+    supabaseClient.auth.onAuthStateChange(
+        (event, session) => {
+
+            currentUser =
+                session
+                    ? session.user
+                    : null;
+
+            afficherUtilisateur();
+
+        }
+    );
+
+}
+
+creerInterfaceAuth();
+
+initialiserAuth();
 /* =========================
 ÉLÉMENTS HTML
 ========================= */
